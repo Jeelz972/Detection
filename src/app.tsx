@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import GestionDashboard from "./features/Gestion/GestionDashboard";
 import DetectionApp from "./features/Detection/DetectionApp";
 import TeamsDashboard from "./features/Teams/TeamsDashboard";
+import StatsDashboard from "./features/Stats/StatsDashboard";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<
@@ -84,20 +85,7 @@ export default function App() {
 
         {currentView === "detection" && <DetectionApp />}
 
-        {currentView === "stats" && (
-          <div className="h-full flex flex-col items-center justify-center p-8 text-center">
-            <div className="h-20 w-20 bg-zinc-900 rounded-full flex items-center justify-center text-4xl mb-6 border border-zinc-800">
-              📈
-            </div>
-            <h2 className="text-2xl font-black text-white uppercase italic">
-              Analyse Comparative
-            </h2>
-            <p className="text-slate-500 max-w-md mt-2">
-              Le module de statistiques globales permettra de comparer les
-              moyennes physiques (Vitesse, Détente) par club et par catégorie.
-            </p>
-          </div>
-        )}
+        {currentView === "stats" && <StatsDashboard />}
       </main>
     </div>
   );
