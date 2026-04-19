@@ -77,6 +77,85 @@ export const DataManager = {
     return db.players;
   },
 
+  getAllTeams: function(): Team[] {
+    return this.getDatabase().teams;
+  },
+
+  saveTeam: function(team: Team): Team[] {
+    const db = this.getDatabase();
+    const idx = db.teams.findIndex((t: Team) => t.id === team.id);
+    const now = new Date().toISOString();
+    if (idx >= 0) {
+      db.teams[idx] = { ...team, updatedAt: now };
+    } else {
+      db.teams.push({ ...team, createdAt: team.createdAt || now, updatedAt: now });
+    }
+    this.saveDatabase(db);
+    return db.teams;
+  },
+
+  deleteTeam: function(teamId: string): Team[] {
+    const db = this.getDatabase();
+    db.teams = db.teams.filter((t: Team) => t.id !== teamId);
+    this.saveDatabase(db);
+    return db.teams;
+  },
+
+  assignPlayerToTeam: function(
+    playerId: string,
+    teamId: string
+  ): { ok: true; teams: Team[] } | { ok: false; reason: string } {
+    const db = this.getDatabase();
+    const player = db.players.find((p: any) => p.id === playerId);
+    const team = db.teams.find((t: Team) => t.id === teamId);
+    if (!player) return { ok: false, reason: "Joueuse introuvable." };
+    if (!team) return { ok: false, reason: "Équipe introuvable." };
+
+    const pi = categoryIndex(player.category);
+    const ti = categoryIndex(team.category);
+    if (ti < pi) return { ok: false, reason: "Sous-classement interdit." };
+    if (ti > pi + 1) return { ok: false, reason: "Surclassement refusé (écart > 1 cran)." };
+
+    const now = new Date().toISOString();
+    db.teams = db.teams.map((t: Team) => {
+      if (t.id === teamId) {
+        const already = t.playerIds.includes(playerId);
+        return already
+          ? t
+          : { ...t, playerIds: [...t.playerIds, playerId], updatedAt: now };
+      }
+      if (t.playerIds.includes(playerId)) {
+        return { ...t, playerIds: t.playerIds.filter((id) => id !== playerId), updatedAt: now };
+      }
+      return t;
+    });
+    this.saveDatabase(db);
+    return { ok: true, teams: db.teams };
+  },
+
+  removePlayerFromTeam: function(playerId: string, teamId: string): Team[] {
+    const db = this.getDatabase();
+    db.teams = db.teams.map((t: Team) =>
+      t.id === teamId
+        ? { ...t, playerIds: t.playerIds.filter((id: string) => id !== playerId), updatedAt: new Date().toISOString() }
+        : t
+    );
+    this.saveDatabase(db);
+    return db.teams;
+  },
+
+  rollOverSeason: function(): void {
+    const db = this.getDatabase();
+    const now = new Date().toISOString();
+    db.players = db.players.map((p: any) => ({
+      ...p,
+      category: nextCategory(p.category as Category),
+      updatedAt: now,
+    }));
+    db.teams = [];
+    this.saveDatabase(db);
+  },
+
   exportToJson: function() {
     const db = this.getDatabase();
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
