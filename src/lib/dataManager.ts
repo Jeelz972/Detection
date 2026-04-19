@@ -1,5 +1,3 @@
-// src/lib/dataManager.ts
-
 const CABF_DATABASE = 'cabf_database';
 
 export const CATEGORY_ORDER = ['U11', 'U13', 'U15', 'U18', 'Senior'] as const;
@@ -69,11 +67,12 @@ export const DataManager = {
   deletePlayer: function(playerId: string) {
     const db = this.getDatabase();
     db.players = db.players.filter((p: any) => p.id !== playerId);
-    db.teams = db.teams.map((t: Team) => ({
-      ...t,
-      playerIds: t.playerIds.filter((id: string) => id !== playerId),
-      updatedAt: new Date().toISOString(),
-    }));
+    const now = new Date().toISOString();
+    db.teams = db.teams.map((t: Team) =>
+      t.playerIds.includes(playerId)
+        ? { ...t, playerIds: t.playerIds.filter((id: string) => id !== playerId), updatedAt: now }
+        : t
+    );
     this.saveDatabase(db);
     return db.players;
   },
