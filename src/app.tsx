@@ -1,15 +1,11 @@
-// src/App.tsx
 import React, { useState } from "react";
 import GestionDashboard from "./features/Gestion/GestionDashboard";
 import DetectionApp from "./features/Detection/DetectionApp";
-
-// Ce module sera créé à l'étape suivante
-// import StatsDashboard from './features/Stats/StatsDashboard';
+import TeamsDashboard from "./features/Teams/TeamsDashboard";
 
 export default function App() {
-  // Navigation : 'gestion' | 'detection' | 'stats'
   const [currentView, setCurrentView] = useState<
-    "gestion" | "detection" | "stats"
+    "gestion" | "teams" | "detection" | "stats"
   >("gestion");
 
   return (
@@ -46,6 +42,16 @@ export default function App() {
                 📋 Roster
               </button>
               <button
+                onClick={() => setCurrentView("teams")}
+                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                  currentView === "teams"
+                    ? "bg-orange-500 text-white shadow-md"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                👥 Équipes
+              </button>
+              <button
                 onClick={() => setCurrentView("detection")}
                 className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
                   currentView === "detection"
@@ -73,6 +79,8 @@ export default function App() {
       {/* ═══ ZONE D'AFFICHAGE DYNAMIQUE ═══ */}
       <main className="flex-1 overflow-hidden relative bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-zinc-900 via-zinc-950 to-zinc-950">
         {currentView === "gestion" && <GestionDashboard />}
+
+        {currentView === "teams" && <TeamsDashboard />}
 
         {currentView === "detection" && <DetectionApp />}
 
