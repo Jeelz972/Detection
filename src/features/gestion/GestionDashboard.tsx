@@ -1,9 +1,12 @@
-// src/features/Gestion/GestionDashboard.tsx
 import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { DataManager } from "../../lib/dataManager";
 
-export default function GestionDashboard() {
+interface Props {
+  onEditPlayer?: (player: any) => void;
+}
+
+export default function GestionDashboard({ onEditPlayer }: Props) {
   const [players, setPlayers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -44,8 +47,8 @@ export default function GestionDashboard() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const data = evt.target?.result;
+        const wb = XLSX.read(data, { type: "array" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const rawData: any[] = XLSX.utils.sheet_to_json(ws);
@@ -79,7 +82,7 @@ export default function GestionDashboard() {
         alert("Le format du fichier n'est pas reconnu.");
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     // Reset de l'input pour pouvoir réimporter le même fichier si besoin
     e.target.value = "";
   };
@@ -207,9 +210,7 @@ export default function GestionDashboard() {
               </span>
               {/* Le bouton Modifier redirigera idéalement vers la Fiche */}
               <button
-                onClick={() =>
-                  alert("L'édition manuelle sera liée à la vue détaillée !")
-                }
+                onClick={() => onEditPlayer?.(player)}
                 className="text-zinc-500 hover:text-orange-500 transition-colors text-xs font-bold"
               >
                 Éditer profil →

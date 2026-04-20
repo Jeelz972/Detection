@@ -1,28 +1,125 @@
-// src/features/Detection/DetectionDashboard.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DataManager } from "../../lib/dataManager";
 import { DetectionEngine } from "../../lib/detectionEngine";
 import { PhotoUpload } from "../../components/PhotoUpload";
 import { PlayerRadar } from "../../components/PlayerRadar";
 
-interface Props {
+interface AppProps {
+  initialPlayer?: any;
+}
+
+export default function DetectionApp({ initialPlayer }: AppProps) {
+  const [players, setPlayers] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any | null>(initialPlayer ?? null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    setPlayers(DataManager.getAllPlayers());
+  }, []);
+
+  useEffect(() => {
+    if (initialPlayer) setSelected(initialPlayer);
+  }, [initialPlayer]);
+
+  const refresh = () => setPlayers(DataManager.getAllPlayers());
+
+  if (selected) {
+    return (
+      <DetectionDashboard
+        player={selected}
+        onBack={() => {
+          setSelected(null);
+          refresh();
+        }}
+        onUpdate={refresh}
+      />
+    );
+  }
+
+  const filtered = players.filter((p) =>
+    `${p.firstName} ${p.lastName}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()),
+  );
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto space-y-8 h-full overflow-y-auto">
+      <div>
+        <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter">
+          Scouting <span className="text-orange-500">Joueuses</span>
+        </h1>
+        <p className="text-slate-500 text-sm mt-1">
+          Sélectionnez une joueuse pour ouvrir sa fiche de détection.
+        </p>
+      </div>
+
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Rechercher une joueuse..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white pl-12 focus:border-orange-500 outline-none transition-all"
+        />
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">
+          🔍
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setSelected(p)}
+            className="text-left bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:border-orange-500/50 transition-all flex items-center gap-4"
+          >
+            <div className="h-14 w-14 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden flex-shrink-0">
+              {p.photoBase64 ? (
+                <img
+                  src={p.photoBase64}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-xl text-zinc-600">
+                  👤
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-white uppercase truncate">
+                {p.lastName} {p.firstName}
+              </div>
+              <div className="text-xs text-slate-500">
+                {p.category} · {p.club || "Sans club"}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {players.length === 0 && (
+        <div className="text-center py-20 bg-zinc-900/50 rounded-3xl border-2 border-dashed border-zinc-800">
+          <p className="text-slate-500 italic">Aucune joueuse en base.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface DashProps {
   player: any;
   onBack: () => void;
   onUpdate: () => void;
 }
 
-export default function DetectionDashboard({
-  player,
-  onBack,
-  onUpdate,
-}: Props) {
+function DetectionDashboard({ player, onBack, onUpdate }: DashProps) {
   const [activeTab, setActiveTab] = useState<
     "profil" | "physique" | "technique"
   >("profil");
   const [localPlayer, setLocalPlayer] = useState(player);
   const [sprintTime, setSprintTime] = useState<string>("");
 
-  // --- Sauvegarde des modifications dans la base locale ---
   const saveChanges = (updatedFields: any) => {
     const updatedPlayer = {
       ...localPlayer,
@@ -31,27 +128,23 @@ export default function DetectionDashboard({
     };
     DataManager.savePlayer(updatedPlayer);
     setLocalPlayer(updatedPlayer);
-    onUpdate(); // Notifie le parent pour rafraîchir la liste si besoin
+    onUpdate();
   };
 
-  // --- Gestion de la photo de profil ---
   const handlePhotoChange = (base64Str: string) => {
     saveChanges({ photoBase64: base64Str });
   };
 
-  // --- Enregistrement d'un test physique (ex: Sprint) ---
   const handleSavePhysicalTest = () => {
     const time = parseFloat(sprintTime);
     if (isNaN(time) || time <= 0) return;
 
-    // 1. Calcul de la note via le moteur (Barèmes)
     const score = DetectionEngine.getRating(
       "Vitesse 20m",
       time,
       localPlayer.category,
     );
 
-    // 2. Création de la nouvelle session
     const newSession = {
       date: new Date().toISOString().split("T")[0],
       tests: {
@@ -59,16 +152,14 @@ export default function DetectionDashboard({
       },
     };
 
-    // 3. Mise à jour de l'historique
     const updatedSessions = [
       ...(localPlayer.physicalSessions || []),
       newSession,
     ];
     saveChanges({ physicalSessions: updatedSessions });
-    setSprintTime(""); // Réinitialise le champ
+    setSprintTime("");
   };
 
-  // --- Préparation des données pour le Graphique Radar ---
   const getRadarData = () => {
     const sessions = localPlayer.physicalSessions || [];
     const latest = sessions[sessions.length - 1];
@@ -85,7 +176,6 @@ export default function DetectionDashboard({
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 text-slate-200">
-      {/* ═══ HEADER : Profil Rapide ═══ */}
       <header className="flex-none bg-zinc-900 border-b border-zinc-800 p-6 shadow-xl">
         <button
           onClick={onBack}
@@ -95,7 +185,6 @@ export default function DetectionDashboard({
         </button>
 
         <div className="flex items-center gap-8">
-          {/* Upload Photo avec compression */}
           <PhotoUpload
             currentPhotoBase64={localPlayer.photoBase64}
             onPhotoChange={handlePhotoChange}
@@ -118,7 +207,6 @@ export default function DetectionDashboard({
         </div>
       </header>
 
-      {/* ═══ NAVIGATION : Onglets ═══ */}
       <nav className="flex-none border-b border-zinc-800 bg-zinc-900/50 px-6">
         <div className="flex gap-8 -mb-px">
           {(["profil", "physique", "technique"] as const).map((tab) => (
@@ -137,9 +225,7 @@ export default function DetectionDashboard({
         </div>
       </nav>
 
-      {/* ═══ CONTENU : Vue active ═══ */}
       <main className="flex-1 overflow-y-auto p-8">
-        {/* --- ONGLET PROFIL --- */}
         {activeTab === "profil" && (
           <div className="max-w-3xl space-y-6">
             <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 shadow-inner">
@@ -176,10 +262,8 @@ export default function DetectionDashboard({
           </div>
         )}
 
-        {/* --- ONGLET PHYSIQUE --- */}
         {activeTab === "physique" && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 max-w-7xl">
-            {/* Colonne Gauche : Saisie et Historique */}
             <div className="xl:col-span-1 space-y-6">
               <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
                 <h3 className="text-lg font-bold text-white mb-4 italic">
@@ -238,14 +322,12 @@ export default function DetectionDashboard({
               </section>
             </div>
 
-            {/* Colonne Droite : Le Graphique Radar */}
             <div className="xl:col-span-2">
               <PlayerRadar data={getRadarData()} color="#f97316" />
             </div>
           </div>
         )}
 
-        {/* --- ONGLET TECHNIQUE --- */}
         {activeTab === "technique" && (
           <div className="flex items-center justify-center h-64 border-2 border-dashed border-zinc-800 rounded-2xl">
             <p className="text-slate-500 italic">

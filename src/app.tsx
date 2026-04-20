@@ -8,6 +8,12 @@ export default function App() {
   const [currentView, setCurrentView] = useState<
     "gestion" | "teams" | "detection" | "stats"
   >("gestion");
+  const [detectionPlayer, setDetectionPlayer] = useState<any | null>(null);
+
+  const handleEditPlayer = (player: any) => {
+    setDetectionPlayer(player);
+    setCurrentView("detection");
+  };
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-slate-200 font-sans">
@@ -79,11 +85,15 @@ export default function App() {
 
       {/* ═══ ZONE D'AFFICHAGE DYNAMIQUE ═══ */}
       <main className="flex-1 overflow-hidden relative bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-zinc-900 via-zinc-950 to-zinc-950">
-        {currentView === "gestion" && <GestionDashboard />}
+        {currentView === "gestion" && (
+          <GestionDashboard onEditPlayer={handleEditPlayer} />
+        )}
 
         {currentView === "teams" && <TeamsDashboard />}
 
-        {currentView === "detection" && <DetectionApp />}
+        {currentView === "detection" && (
+          <DetectionApp initialPlayer={detectionPlayer} />
+        )}
 
         {currentView === "stats" && <StatsDashboard />}
       </main>
