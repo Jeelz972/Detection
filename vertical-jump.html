@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VERTICAL — Mesure de détente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;600;800&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #08080A;
+    --surface: #111114;
+    --surface-2: #17171C;
+    --surface-3: #1E1E24;
+    --border: #26262E;
+    --border-bright: #35353F;
+    --accent: #FF6B1A;
+    --accent-bright: #FF8A3D;
+    --accent-dim: rgba(255, 107, 26, 0.12);
+    --cyan: #6EF0FF;
+    --lime: #C6FF3D;
+    --text: #F5F5F0;
+    --text-dim: #8A8A92;
+    --text-faint: #4A4A52;
+    --danger: #FF4D4D;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Manrope', -apple-system, sans-serif;
+    font-weight: 400;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(ellipse at top right, rgba(255, 107, 26, 0.06), transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(110, 240, 255, 0.04), transparent 50%);
+    background-attachment: fixed;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    z-index: 1000;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  .app {
+    min-height: 100dvh;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 16px 100px;
+    position: relative;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 36px; height: 36px; background: var(--accent);
+    clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-mark::after {
+    content: '↑'; font-family: 'Anton', sans-serif; font-size: 22px;
+    color: var(--bg); line-height: 1; transform: translateY(-1px);
+  }
+  .brand-text h1 {
+    font-family: 'Anton', sans-serif; font-size: 26px; font-weight: 400;
+    letter-spacing: 0.04em; line-height: 1; margin-bottom: 2px;
+  }
+  .brand-text span {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.25em; color: var(--text-dim); text-transform: uppercase;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: var(--surface); border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim);
+  }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-faint); transition: all 0.3s;
+  }
+  .status-dot.live {
+    background: var(--accent); box-shadow: 0 0 10px var(--accent);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .status-dot.ready {
+    background: var(--lime); box-shadow: 0 0 10px var(--lime);
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .stage {
+    position: relative; width: 100%; aspect-ratio: 3 / 4;
+    background: var(--surface); border: 1px solid var(--border);
+    overflow: hidden; margin-bottom: 20px;
+  }
+  @media (min-width: 768px) { .stage { aspect-ratio: 16 / 10; } }
+
+  .stage video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; transform: scaleX(-1); background: #000;
+  }
+  .stage canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .stage::before, .stage::after, .bracket-tr, .bracket-br {
+    content: ''; position: absolute; width: 24px; height: 24px;
+    border: 2px solid var(--accent); pointer-events: none; z-index: 5;
+  }
+  .stage::before { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
+  .stage::after { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
+  .bracket-tr { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
+  .bracket-br { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
+
+  .stage-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; background: rgba(8, 8, 10, 0.88);
+    backdrop-filter: blur(8px); z-index: 4; padding: 30px; text-align: center;
+  }
+  .overlay-content { max-width: 360px; }
+  .overlay-icon {
+    width: 56px; height: 56px; border: 2px solid var(--accent);
+    margin: 0 auto 20px; display: flex; align-items: center;
+    justify-content: center; font-size: 28px; color: var(--accent);
+  }
+  .overlay-title {
+    font-family: 'Anton', sans-serif; font-size: 22px;
+    letter-spacing: 0.03em; margin-bottom: 10px; line-height: 1.1;
+  }
+  .overlay-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+  .countdown {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center; z-index: 6; pointer-events: none;
+    flex-direction: column;
+  }
+  .countdown-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: -20px; white-space: nowrap;
+  }
+  .countdown-number {
+    font-family: 'Anton', sans-serif; font-size: 240px; color: var(--accent);
+    line-height: 1; text-shadow: 0 0 40px rgba(255, 107, 26, 0.6);
+    animation: countPulse 1s ease-out;
+  }
+  @keyframes countPulse {
+    0% { transform: scale(0.3); opacity: 0; }
+    20% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .hud {
+    position: absolute; top: 52px; right: 16px;
+    display: flex; flex-direction: column; gap: 6px; z-index: 3;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  }
+  .hud-item {
+    background: rgba(8, 8, 10, 0.8); border: 1px solid var(--border);
+    padding: 6px 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    backdrop-filter: blur(4px);
+  }
+  .hud-item span { color: var(--accent); font-weight: 600; margin-left: 4px; }
+
+  /* Batch progress bar */
+  .batch-bar {
+    position: absolute; top: 16px; left: 50%;
+    transform: translateX(-50%); z-index: 3;
+    background: rgba(8, 8, 10, 0.85); border: 1px solid var(--accent);
+    backdrop-filter: blur(4px);
+    padding: 8px 14px; display: none;
+    align-items: center; gap: 12px;
+  }
+  .batch-bar.visible { display: flex; }
+  .batch-bar-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--text);
+    white-space: nowrap;
+  }
+  .batch-bar-dots { display: flex; gap: 5px; }
+  .batch-dot {
+    width: 10px; height: 10px; background: var(--surface-3);
+    border: 1px solid var(--border-bright);
+  }
+  .batch-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .batch-dot.done { background: var(--lime); border-color: var(--lime); }
+
+  .result-card {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 24px 20px; margin-bottom: 20px;
+    position: relative; overflow: hidden;
+  }
+  .result-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-bright), transparent);
+  }
+  .result-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 8px;
+  }
+  .result-value { display: flex; align-items: baseline; gap: 8px; font-family: 'Anton', sans-serif; }
+  .result-number {
+    font-size: 88px; line-height: 0.85; letter-spacing: -0.02em;
+    color: var(--text); font-variant-numeric: tabular-nums;
+  }
+  .result-number.big { font-size: 120px; color: var(--accent); }
+  .result-unit { font-size: 28px; color: var(--text-dim); letter-spacing: 0.05em; }
+
+  .result-secondary {
+    display: flex; gap: 20px; margin-top: 16px;
+    padding-top: 16px; border-top: 1px solid var(--border);
+  }
+  .result-stat { flex: 1; }
+  .result-stat-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--text-faint); margin-bottom: 4px;
+  }
+  .result-stat-value {
+    font-family: 'Anton', sans-serif; font-size: 24px; letter-spacing: 0.02em;
+  }
+  .result-stat-value.cyan { color: var(--cyan); }
+  .result-stat-value.lime { color: var(--lime); }
+
+  /* Batch summary card (post-série) */
+  .batch-summary {
+    background: var(--surface); border: 1px solid var(--accent);
+    padding: 20px; margin-bottom: 20px; display: none; position: relative;
+  }
+  .batch-summary.visible { display: block; }
+  .batch-summary::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent);
+  }
+  .batch-summary-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+  .batch-summary-title {
+    font-family: 'Anton', sans-serif; font-size: 22px; letter-spacing: 0.05em;
+  }
+  .batch-summary-time {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-dim); letter-spacing: 0.15em;
+  }
+  .batch-jumps {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px;
+  }
+  .batch-jump {
+    text-align: center; padding: 14px 8px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    position: relative;
+  }
+  .batch-jump.best {
+    border-color: var(--accent); background: var(--accent-dim);
+  }
+  .batch-jump-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-dim); letter-spacing: 0.2em; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .batch-jump-val {
+    font-family: 'Anton', sans-serif; font-size: 30px; letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .batch-jump.best .batch-jump-val { color: var(--accent); }
+  .batch-jump-unit {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-dim); margin-left: 2px; letter-spacing: 0.1em;
+  }
+  .batch-jump-tag {
+    position: absolute; top: -1px; right: -1px;
+    background: var(--accent); color: var(--bg);
+    font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800;
+    letter-spacing: 0.15em; padding: 2px 5px; text-transform: uppercase;
+  }
+
+  .batch-stats {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .batch-stat {
+    background: var(--surface-2); padding: 12px 14px;
+    border-left: 2px solid var(--border-bright);
+  }
+  .batch-stat.primary { border-left-color: var(--accent); }
+  .batch-stat.cv { border-left-color: var(--cyan); }
+  .batch-stat-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-dim); letter-spacing: 0.2em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .batch-stat-value {
+    font-family: 'Anton', sans-serif; font-size: 26px; letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .batch-stat-value .tiny {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-dim); margin-left: 3px; letter-spacing: 0.1em;
+  }
+
+  .cv-comment {
+    margin-top: 10px; padding: 10px 12px;
+    background: var(--surface-2);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-dim); letter-spacing: 0.05em; line-height: 1.5;
+    border-left: 2px solid var(--cyan);
+  }
+  .cv-comment .rating { font-weight: 700; }
+  .cv-comment .rating.good { color: var(--lime); }
+  .cv-comment .rating.ok { color: var(--cyan); }
+  .cv-comment .rating.warn { color: var(--accent); }
+  .cv-comment .rating.bad { color: var(--danger); }
+
+  .setup-card {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 20px; margin-bottom: 16px;
+  }
+  .setup-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-dim);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .setup-title::before {
+    content: ''; width: 16px; height: 2px; background: var(--accent);
+  }
+
+  .height-input-wrap {
+    display: flex; align-items: baseline; gap: 12px;
+    background: var(--bg); border: 1px solid var(--border); padding: 14px 18px;
+    transition: border-color 0.15s;
+  }
+  .height-input-wrap:focus-within { border-color: var(--accent); }
+  .height-input-wrap input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'Anton', sans-serif; font-size: 40px;
+    letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+    min-width: 0; padding: 0;
+  }
+  .height-input-wrap input::-webkit-outer-spin-button,
+  .height-input-wrap input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .height-input-wrap .unit {
+    font-family: 'JetBrains Mono', monospace; font-size: 14px;
+    color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  .mode-toggle {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    padding: 2px;
+  }
+  .mode-btn {
+    background: transparent; border: none; color: var(--text-dim);
+    font-family: 'Anton', sans-serif; font-size: 13px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 12px 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .mode-btn:hover { color: var(--text); }
+  .mode-btn.active { background: var(--accent); color: var(--bg); }
+  .mode-btn-sub {
+    font-family: 'JetBrains Mono', monospace; font-size: 8px;
+    letter-spacing: 0.15em; opacity: 0.7; display: block;
+    margin-top: 3px; font-weight: 400;
+  }
+
+  .controls { display: grid; gap: 12px; margin-bottom: 24px; }
+  .control-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .btn {
+    border: none; background: var(--surface); color: var(--text);
+    font-family: 'Anton', sans-serif; font-size: 16px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 18px 16px; cursor: pointer; border: 1px solid var(--border);
+    transition: all 0.15s; display: flex; align-items: center;
+    justify-content: center; gap: 8px; position: relative; overflow: hidden;
+  }
+  .btn:hover:not(:disabled) {
+    border-color: var(--border-bright); background: var(--surface-2);
+  }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn.primary {
+    background: var(--accent); color: var(--bg); border-color: var(--accent);
+  }
+  .btn.primary:hover:not(:disabled) {
+    background: var(--accent-bright); border-color: var(--accent-bright);
+  }
+  .btn.primary.pulsing { animation: btnPulse 1.8s ease-in-out infinite; }
+  @keyframes btnPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 26, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(255, 107, 26, 0); }
+  }
+  .btn.ghost { background: transparent; }
+  .btn-icon { font-size: 18px; }
+
+  .history { margin-top: 28px; }
+  .history-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 14px;
+  }
+  .history-title { font-family: 'Anton', sans-serif; font-size: 22px; letter-spacing: 0.04em; }
+  .history-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase;
+  }
+
+  .history-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .history-session {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 12px 14px;
+  }
+  .history-session.batch { border-left: 2px solid var(--accent); }
+
+  .history-session-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .history-session-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase;
+  }
+  .history-session-time {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-faint);
+  }
+  .history-session-body {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  .history-main {
+    font-family: 'Anton', sans-serif; font-size: 28px;
+    letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+  }
+  .history-main .unit {
+    font-size: 11px; color: var(--text-dim); margin-left: 3px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em;
+  }
+  .history-sub {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-dim); letter-spacing: 0.05em;
+  }
+  .history-sub b { color: var(--text); font-weight: 700; }
+
+  .history-empty {
+    text-align: center; padding: 40px 20px;
+    color: var(--text-faint); font-size: 13px;
+    border: 1px dashed var(--border);
+  }
+
+  .info-panel {
+    margin-top: 32px; padding: 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: 12px; line-height: 1.7; color: var(--text-dim);
+  }
+  .info-panel h3 {
+    font-family: 'Anton', sans-serif; font-size: 16px;
+    letter-spacing: 0.05em; color: var(--text); margin-bottom: 10px;
+  }
+  .info-panel ul { padding-left: 18px; }
+  .info-panel li { margin-bottom: 6px; }
+  .info-panel b.accent { color: var(--accent); font-weight: 600; }
+  .info-panel b.cyan { color: var(--cyan); font-weight: 600; }
+
+  .error-msg {
+    background: rgba(255, 77, 77, 0.08); border: 1px solid var(--danger);
+    color: var(--danger); padding: 12px 16px; font-size: 12px;
+    margin-bottom: 16px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface-2); border: 1px solid var(--border-bright);
+    padding: 12px 20px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    z-index: 100; transition: transform 0.3s; max-width: 90%;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--lime); color: var(--lime); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  .flash {
+    position: absolute; inset: 0;
+    background: var(--accent); mix-blend-mode: screen;
+    opacity: 0; pointer-events: none; z-index: 4;
+  }
+  .flash.active { animation: flashBurst 0.4s ease-out; }
+  @keyframes flashBurst {
+    0% { opacity: 0; }
+    20% { opacity: 0.25; }
+    100% { opacity: 0; }
+  }
+
+  @media (min-width: 900px) {
+    .app { padding: 32px 32px 80px; }
+    .layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+    .col-side { display: flex; flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-text">
+        <h1>VERTICAL</h1>
+        <span>Jump measurement · v1.1</span>
+      </div>
+    </div>
+    <div class="status-pill" id="statusPill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Inactif</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="col-main">
+      <div class="stage" id="stage">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="bracket-tr"></div>
+        <div class="bracket-br"></div>
+        <div class="flash" id="flash"></div>
+
+        <div class="batch-bar" id="batchBar">
+          <div class="batch-bar-label" id="batchBarLabel">SÉRIE · 1/3</div>
+          <div class="batch-bar-dots">
+            <div class="batch-dot" data-idx="0"></div>
+            <div class="batch-dot" data-idx="1"></div>
+            <div class="batch-dot" data-idx="2"></div>
+          </div>
+        </div>
+
+        <div class="hud" id="hud" style="display: none;">
+          <div class="hud-item">FPS<span id="fpsVal">0</span></div>
+          <div class="hud-item">CONF<span id="confVal">0%</span></div>
+          <div class="hud-item">Δ Y<span id="deltaVal">0</span></div>
+        </div>
+
+        <div class="countdown" id="countdown" style="display:none;">
+          <div class="countdown-label" id="countdownLabel"></div>
+          <div class="countdown-number" id="countdownNum">3</div>
+        </div>
+
+        <div class="stage-overlay" id="overlay">
+          <div class="overlay-content">
+            <div class="overlay-icon">◎</div>
+            <div class="overlay-title" id="overlayTitle">Caméra inactive</div>
+            <div class="overlay-text" id="overlayText">Entre ta taille puis active la caméra. Place le téléphone à 2–3 m, corps entier visible avec marge au-dessus.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-card" id="resultCard">
+        <div class="result-label">Dernière détente</div>
+        <div class="result-value">
+          <div class="result-number big" id="resultNum">—</div>
+          <div class="result-unit">cm</div>
+        </div>
+        <div class="result-secondary">
+          <div class="result-stat">
+            <div class="result-stat-label">Record</div>
+            <div class="result-stat-value cyan" id="bestVal">— cm</div>
+          </div>
+          <div class="result-stat">
+            <div class="result-stat-label">Moyenne globale</div>
+            <div class="result-stat-value lime" id="avgVal">— cm</div>
+          </div>
+          <div class="result-stat">
+            <div class="result-stat-label">Sauts totaux</div>
+            <div class="result-stat-value" id="countVal">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="batch-summary" id="batchSummary">
+        <div class="batch-summary-header">
+          <div class="batch-summary-title">SÉRIE · 3 SAUTS</div>
+          <div class="batch-summary-time" id="batchSummaryTime">—</div>
+        </div>
+        <div class="batch-jumps" id="batchJumps"></div>
+        <div class="batch-stats">
+          <div class="batch-stat primary">
+            <div class="batch-stat-label">Meilleur</div>
+            <div class="batch-stat-value" id="batchBest">— <span class="tiny">cm</span></div>
+          </div>
+          <div class="batch-stat">
+            <div class="batch-stat-label">Moyenne</div>
+            <div class="batch-stat-value" id="batchMean">— <span class="tiny">cm</span></div>
+          </div>
+          <div class="batch-stat">
+            <div class="batch-stat-label">Écart-type σ</div>
+            <div class="batch-stat-value" id="batchStd">± — <span class="tiny">cm</span></div>
+          </div>
+          <div class="batch-stat cv">
+            <div class="batch-stat-label">CV</div>
+            <div class="batch-stat-value" id="batchCV">— <span class="tiny">%</span></div>
+          </div>
+        </div>
+        <div class="cv-comment" id="batchComment"></div>
+      </div>
+    </div>
+
+    <div class="col-side">
+      <div class="setup-card">
+        <div class="setup-title">Ta taille</div>
+        <div class="height-input-wrap">
+          <input type="number" id="heightInput" value="180" min="120" max="230" inputmode="numeric">
+          <span class="unit">cm</span>
+        </div>
+      </div>
+
+      <div class="setup-card" style="padding: 16px;">
+        <div class="setup-title">Mode de mesure</div>
+        <div class="mode-toggle">
+          <button class="mode-btn active" data-mode="single">
+            1 SAUT<span class="mode-btn-sub">mesure unique</span>
+          </button>
+          <button class="mode-btn" data-mode="batch">
+            SÉRIE 3<span class="mode-btn-sub">moyenne · CV</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="errorMsg" class="error-msg" style="display:none;"></div>
+
+      <div class="controls">
+        <button class="btn primary" id="btnStart">
+          <span class="btn-icon">▶</span>
+          Activer caméra
+        </button>
+        <div class="control-row">
+          <button class="btn" id="btnCalibrate" disabled>
+            <span class="btn-icon">◎</span>
+            Calibrer
+          </button>
+          <button class="btn" id="btnSwitch" disabled>
+            <span class="btn-icon">⇆</span>
+            Caméra
+          </button>
+        </div>
+        <button class="btn primary" id="btnMeasure" disabled>
+          <span class="btn-icon">↑</span>
+          <span id="btnMeasureLabel">Mesurer un saut</span>
+        </button>
+        <button class="btn ghost" id="btnReset">
+          <span class="btn-icon">↺</span>
+          Réinitialiser l'historique
+        </button>
+      </div>
+
+      <div class="history">
+        <div class="history-header">
+          <div class="history-title">HISTORIQUE</div>
+          <div class="history-count" id="historyCount">0 session</div>
+        </div>
+        <div class="history-list" id="historyList">
+          <div class="history-empty">Aucune mesure enregistrée.<br>Lance une session pour commencer.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-panel">
+    <h3>Mode série — pour le testing</h3>
+    <p style="margin-bottom:10px;">
+      La série enchaîne <b class="accent">3 sauts</b> avec <b class="accent">5 s de récup</b> entre chaque. En sortie :
+    </p>
+    <ul>
+      <li><b class="accent">Meilleur</b> — le plus haut des 3 (ce que tu retiens pour un carnet de perf)</li>
+      <li><b>Moyenne</b> — niveau de détente stabilisé, moins sensible à un saut parfait ou raté</li>
+      <li><b>Écart-type (σ)</b> — dispersion absolue en cm</li>
+      <li><b class="cyan">CV</b> (coefficient de variation = σ/moyenne × 100) — indicateur de consistance :
+        &lt;3% excellent · 3–5% bon · 5–8% moyen · &gt;8% irrégulier. Un CV faible = exécution fiable (utile pour distinguer un plateau technique d'une marge de progression)</li>
+    </ul>
+    <p style="font-size:11px; color:var(--text-faint); margin-top:10px;">
+      Précision typique : ±2 à 4 cm. Pour comparer deux athlètes ou deux séances, garde exactement les mêmes conditions (caméra, position, recalage).
+    </p>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.15.0/dist/tf-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.15.0/dist/tf-converter.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.15.0/dist/tf-backend-webgl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+
+<script>
+(() => {
+  // ==========================================================================
+  // STATE
+  // ==========================================================================
+  const state = {
+    stream: null,
+    detector: null,
+    running: false,
+    facingMode: 'environment',
+    phase: 'idle',
+    mode: 'single',
+    cmPerPixel: null,
+    floorY: null,
+    calibrationSamples: [],
+    minAnkleY: null,
+    sessions: [],
+    fpsTimes: [],
+    lastConfidence: 0,
+    batchInProgress: false,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const video = $('video');
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // ==========================================================================
+  // UTILS
+  // ==========================================================================
+  function setStatus(text, variant = '') {
+    $('statusText').textContent = text;
+    const dot = $('statusDot');
+    dot.className = 'status-dot';
+    if (variant) dot.classList.add(variant);
+  }
+  function showOverlay(title, text, icon = '◎') {
+    $('overlayTitle').textContent = title;
+    $('overlayText').textContent = text;
+    document.querySelector('.overlay-icon').textContent = icon;
+    $('overlay').style.display = 'flex';
+  }
+  function hideOverlay() { $('overlay').style.display = 'none'; }
+  function showError(msg) { const el = $('errorMsg'); el.textContent = msg; el.style.display = 'block'; }
+  function hideError() { $('errorMsg').style.display = 'none'; }
+  function toast(msg, variant = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + variant;
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => { t.classList.remove('show'); }, 2400);
+  }
+  function avgFps() {
+    const now = performance.now();
+    state.fpsTimes.push(now);
+    state.fpsTimes = state.fpsTimes.filter(t => now - t < 1000);
+    return state.fpsTimes.length;
+  }
+  function formatTime(d) {
+    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  function computeStats(values) {
+    const n = values.length;
+    if (!n) return null;
+    const mean = values.reduce((a, b) => a + b, 0) / n;
+    const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+    const std = Math.sqrt(variance);
+    const best = Math.max(...values);
+    const cv = mean > 0 ? (std / mean) * 100 : 0;
+    return { mean, std, best, cv, n };
+  }
+
+  // ==========================================================================
+  // CAMERA
+  // ==========================================================================
+  async function startCamera() {
+    hideError();
+    try {
+      setStatus('Connexion caméra', 'live');
+      showOverlay('Démarrage…', 'Autorise l\'accès à la caméra.', '◎');
+      if (state.stream) state.stream.getTracks().forEach(t => t.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: state.facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      state.stream = stream;
+      video.srcObject = stream;
+      await new Promise(res => { video.onloadedmetadata = () => { video.play(); res(); }; });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      await initDetector();
+      state.phase = 'camera';
+      state.running = true;
+      hideOverlay();
+      setStatus('Caméra active', 'ready');
+      $('btnStart').innerHTML = '<span class="btn-icon">■</span> Couper caméra';
+      $('btnCalibrate').disabled = false;
+      $('btnSwitch').disabled = false;
+      $('hud').style.display = 'flex';
+      requestAnimationFrame(detectionLoop);
+      toast('Caméra prête · calibre ta taille', 'success');
+    } catch (err) {
+      console.error(err);
+      showError(`Erreur caméra : ${err.name || ''} ${err.message || err}`);
+      showOverlay('Caméra indisponible', 'Vérifie les autorisations du navigateur.', '⚠');
+      setStatus('Erreur', '');
+    }
+  }
+
+  function stopCamera() {
+    state.running = false;
+    if (state.stream) { state.stream.getTracks().forEach(t => t.stop()); state.stream = null; }
+    video.srcObject = null;
+    state.phase = 'idle';
+    setStatus('Inactif');
+    $('btnStart').innerHTML = '<span class="btn-icon">▶</span> Activer caméra';
+    $('btnCalibrate').disabled = true;
+    $('btnMeasure').disabled = true;
+    $('btnSwitch').disabled = true;
+    $('hud').style.display = 'none';
+    showOverlay('Caméra inactive', 'Clique sur "Activer caméra" pour reprendre.', '◎');
+  }
+
+  async function switchCamera() {
+    state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+    await startCamera();
+  }
+
+  // ==========================================================================
+  // DETECTOR
+  // ==========================================================================
+  async function initDetector() {
+    if (state.detector) return;
+    await tf.setBackend('webgl');
+    await tf.ready();
+    state.detector = await poseDetection.createDetector(
+      poseDetection.SupportedModels.MoveNet,
+      { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING, enableSmoothing: true }
+    );
+  }
+
+  // ==========================================================================
+  // DETECTION LOOP
+  // ==========================================================================
+  async function detectionLoop() {
+    if (!state.running) return;
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+
+    let poses = [];
+    try { poses = await state.detector.estimatePoses(video, { flipHorizontal: false }); }
+    catch (e) { console.warn('pose err', e); }
+
+    $('fpsVal').textContent = avgFps();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+
+    if (state.floorY != null) {
+      ctx.strokeStyle = '#6EF0FF';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(0, state.floorY); ctx.lineTo(canvas.width, state.floorY); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (state.phase === 'measuring' && state.minAnkleY != null && state.floorY != null) {
+      ctx.strokeStyle = '#FF6B1A';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, state.minAnkleY); ctx.lineTo(canvas.width, state.minAnkleY); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (poses.length > 0) {
+      drawPose(poses[0]);
+      handlePose(poses[0]);
+    }
+
+    ctx.restore();
+
+    if (state.phase === 'measuring' && state.minAnkleY != null && state.floorY != null && state.cmPerPixel) {
+      const deltaY = state.floorY - state.minAnkleY;
+      const cm = deltaY * state.cmPerPixel;
+      ctx.fillStyle = '#FF6B1A';
+      ctx.font = '800 18px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`+ ${cm.toFixed(1)} cm`, canvas.width - 14, Math.max(20, state.minAnkleY - 8));
+    }
+
+    requestAnimationFrame(detectionLoop);
+  }
+
+  // ==========================================================================
+  // POSE DRAW & ANALYZE
+  // ==========================================================================
+  const SKELETON = [
+    ['left_shoulder','right_shoulder'],
+    ['left_shoulder','left_elbow'], ['left_elbow','left_wrist'],
+    ['right_shoulder','right_elbow'], ['right_elbow','right_wrist'],
+    ['left_shoulder','left_hip'], ['right_shoulder','right_hip'],
+    ['left_hip','right_hip'],
+    ['left_hip','left_knee'], ['left_knee','left_ankle'],
+    ['right_hip','right_knee'], ['right_knee','right_ankle'],
+  ];
+
+  function drawPose(pose) {
+    const kp = {};
+    pose.keypoints.forEach(k => kp[k.name] = k);
+    ctx.strokeStyle = 'rgba(245, 245, 240, 0.55)';
+    ctx.lineWidth = 3;
+    SKELETON.forEach(([a, b]) => {
+      const ka = kp[a], kb = kp[b];
+      if (ka && kb && ka.score > 0.3 && kb.score > 0.3) {
+        ctx.beginPath(); ctx.moveTo(ka.x, ka.y); ctx.lineTo(kb.x, kb.y); ctx.stroke();
+      }
+    });
+    pose.keypoints.forEach(k => {
+      if (k.score < 0.3) return;
+      const isAnkle = k.name === 'left_ankle' || k.name === 'right_ankle';
+      ctx.fillStyle = isAnkle ? '#FF6B1A' : '#F5F5F0';
+      ctx.beginPath(); ctx.arc(k.x, k.y, isAnkle ? 7 : 4, 0, Math.PI * 2); ctx.fill();
+      if (isAnkle) {
+        ctx.strokeStyle = '#FF6B1A'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(k.x, k.y, 13, 0, Math.PI * 2); ctx.stroke();
+      }
+    });
+  }
+
+  function getAnkleY(pose) {
+    const la = pose.keypoints.find(k => k.name === 'left_ankle');
+    const ra = pose.keypoints.find(k => k.name === 'right_ankle');
+    const values = [];
+    if (la && la.score > 0.3) values.push(la.y);
+    if (ra && ra.score > 0.3) values.push(ra.y);
+    if (!values.length) return null;
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }
+
+  function getBodyPixelHeight(pose) {
+    const head = ['nose','left_eye','right_eye','left_ear','right_ear']
+      .map(n => pose.keypoints.find(k => k.name === n))
+      .filter(k => k && k.score > 0.3).map(k => k.y);
+    const ankles = ['left_ankle','right_ankle']
+      .map(n => pose.keypoints.find(k => k.name === n))
+      .filter(k => k && k.score > 0.3).map(k => k.y);
+    if (!head.length || !ankles.length) return null;
+    return Math.max(...ankles) - Math.min(...head);
+  }
+
+  function getOverallConfidence(pose) {
+    const names = ['left_ankle','right_ankle','nose','left_hip','right_hip'];
+    const scores = names.map(n => pose.keypoints.find(k => k.name === n))
+      .filter(Boolean).map(k => k.score);
+    return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  }
+
+  function handlePose(pose) {
+    const conf = getOverallConfidence(pose);
+    state.lastConfidence = conf;
+    $('confVal').textContent = Math.round(conf * 100) + '%';
+    const ankleY = getAnkleY(pose);
+
+    if (state.phase === 'calibrating' && ankleY != null && conf > 0.35) {
+      const bodyH = getBodyPixelHeight(pose);
+      if (bodyH != null) state.calibrationSamples.push({ ankleY, bodyH });
+    } else if (state.phase === 'measuring' && ankleY != null) {
+      if (state.minAnkleY == null || ankleY < state.minAnkleY) state.minAnkleY = ankleY;
+      if (state.floorY != null) $('deltaVal').textContent = (state.floorY - ankleY).toFixed(0);
+    } else if (ankleY != null) {
+      $('deltaVal').textContent = '0';
+    }
+  }
+
+  // ==========================================================================
+  // CALIBRATION
+  // ==========================================================================
+  async function calibrate() {
+    const heightCm = parseFloat($('heightInput').value);
+    if (!heightCm || heightCm < 80 || heightCm > 250) {
+      toast('Taille invalide', 'error'); return;
+    }
+    hideError();
+    state.phase = 'calibrating';
+    state.calibrationSamples = [];
+    setStatus('Calibration…', 'live');
+    $('btnCalibrate').disabled = true;
+    $('btnMeasure').disabled = true;
+    toast('Reste immobile…');
+    await new Promise(r => setTimeout(r, 2500));
+    state.phase = 'camera';
+
+    const samples = state.calibrationSamples;
+    if (samples.length < 8) {
+      showError('Pas assez de points détectés. Vérifie le cadrage (corps entier visible) et réessaie.');
+      setStatus('Caméra active', 'ready');
+      $('btnCalibrate').disabled = false;
+      toast('Calibration échouée', 'error');
+      return;
+    }
+    const bodyHeights = samples.map(s => s.bodyH).sort((a, b) => a - b);
+    const ankleYs = samples.map(s => s.ankleY).sort((a, b) => a - b);
+    const medianBodyH = bodyHeights[Math.floor(bodyHeights.length / 2)];
+    const medianAnkleY = ankleYs[Math.floor(ankleYs.length / 2)];
+    const estimatedFullPixelHeight = medianBodyH / 0.88;
+    const cmPerPixel = heightCm / estimatedFullPixelHeight;
+
+    state.cmPerPixel = cmPerPixel;
+    state.floorY = medianAnkleY;
+
+    $('btnCalibrate').disabled = false;
+    $('btnMeasure').disabled = false;
+    setStatus('Calibré', 'ready');
+    $('btnCalibrate').innerHTML = '<span class="btn-icon">✓</span> Recalibrer';
+    $('btnMeasure').classList.add('pulsing');
+    toast(`Calibré · ${(cmPerPixel * 10).toFixed(2)} cm / 10 px`, 'success');
+  }
+
+  // ==========================================================================
+  // MEASUREMENT CORE (reusable for single or batch)
+  // ==========================================================================
+  async function runJumpCountdown(label = '') {
+    $('countdownLabel').textContent = label;
+    $('countdown').style.display = 'flex';
+    const el = $('countdownNum');
+    el.style.color = '';
+    el.style.textShadow = '';
+    for (let i = 3; i >= 1; i--) {
+      el.textContent = i;
+      el.style.animation = 'none'; void el.offsetWidth;
+      el.style.animation = 'countPulse 0.9s ease-out';
+      await new Promise(r => setTimeout(r, 900));
+    }
+    $('countdown').style.display = 'none';
+  }
+
+  async function runRecovery(ms, label = 'RÉCUP') {
+    const steps = Math.ceil(ms / 1000);
+    $('countdownLabel').textContent = label;
+    $('countdown').style.display = 'flex';
+    const el = $('countdownNum');
+    el.style.color = 'var(--cyan)';
+    el.style.textShadow = '0 0 40px rgba(110, 240, 255, 0.6)';
+    for (let i = steps; i >= 1; i--) {
+      el.textContent = i;
+      el.style.animation = 'none'; void el.offsetWidth;
+      el.style.animation = 'countPulse 0.9s ease-out';
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    el.style.color = '';
+    el.style.textShadow = '';
+    $('countdown').style.display = 'none';
+  }
+
+  async function performSingleMeasurement(countdownLabel = '') {
+    await runJumpCountdown(countdownLabel);
+    setStatus('SAUTE !', 'live');
+    toast('SAUTE !', 'success');
+    state.phase = 'measuring';
+    state.minAnkleY = state.floorY;
+    await new Promise(r => setTimeout(r, 2500));
+    state.phase = 'camera';
+
+    const peakY = state.minAnkleY;
+    const deltaPixels = state.floorY - peakY;
+    const heightCm = Math.max(0, deltaPixels * state.cmPerPixel);
+    state.minAnkleY = null;
+
+    if (heightCm < 3) return null;
+
+    const flash = $('flash');
+    flash.classList.remove('active'); void flash.offsetWidth; flash.classList.add('active');
+    return heightCm;
+  }
+
+  // ==========================================================================
+  // SINGLE JUMP
+  // ==========================================================================
+  async function measureSingle() {
+    if (!state.cmPerPixel || state.floorY == null) { toast('Calibre d\'abord', 'error'); return; }
+    hideError();
+    disableControlsDuringMeasure(true);
+
+    const h = await performSingleMeasurement();
+
+    if (h == null) {
+      showError('Saut non détecté. Vérifie le cadrage et réessaie.');
+      setStatus('Calibré', 'ready');
+      disableControlsDuringMeasure(false);
+      return;
+    }
+
+    state.sessions.unshift({ type: 'single', jumps: [{ heightCm: h }], timestamp: new Date() });
+    if (state.sessions.length > 30) state.sessions.length = 30;
+
+    $('batchSummary').classList.remove('visible');
+    $('resultCard').style.display = 'block';
+    renderSingleResult(h);
+    renderHistory();
+    setStatus('Calibré', 'ready');
+    disableControlsDuringMeasure(false);
+    toast(`Détente : ${h.toFixed(1)} cm`, 'success');
+  }
+
+  // ==========================================================================
+  // BATCH (3 JUMPS)
+  // ==========================================================================
+  async function measureBatch() {
+    if (!state.cmPerPixel || state.floorY == null) { toast('Calibre d\'abord', 'error'); return; }
+    hideError();
+    disableControlsDuringMeasure(true);
+    $('batchSummary').classList.remove('visible');
+    $('resultCard').style.display = 'none';
+
+    state.batchInProgress = true;
+    $('batchBar').classList.add('visible');
+
+    const RECOVERY_MS = 5000;
+    const results = [];
+
+    try {
+      for (let i = 0; i < 3; i++) {
+        updateBatchDots(i, results.length);
+        $('batchBarLabel').textContent = `SÉRIE · SAUT ${i + 1}/3`;
+
+        const h = await performSingleMeasurement(`Saut ${i + 1} / 3`);
+
+        if (h == null) {
+          showError(`Saut ${i + 1} non détecté. Série interrompue — recommence.`);
+          $('batchBar').classList.remove('visible');
+          state.batchInProgress = false;
+          setStatus('Calibré', 'ready');
+          disableControlsDuringMeasure(false);
+          $('resultCard').style.display = 'block';
+          return;
+        }
+
+        results.push(h);
+        toast(`Saut ${i + 1} : ${h.toFixed(1)} cm`, 'success');
+
+        if (i < 2) {
+          updateBatchDots(-1, results.length);
+          $('batchBarLabel').textContent = `RÉCUP · SAUT ${i + 2} ARRIVE`;
+          setStatus(`Récup ${RECOVERY_MS / 1000}s`, 'live');
+          await runRecovery(RECOVERY_MS, `RÉCUP · SAUT ${i + 2}`);
+        }
+      }
+    } finally {
+      $('batchBar').classList.remove('visible');
+      state.batchInProgress = false;
+    }
+
+    const jumps = results.map(h => ({ heightCm: h }));
+    const session = { type: 'batch', jumps, timestamp: new Date() };
+    state.sessions.unshift(session);
+    if (state.sessions.length > 30) state.sessions.length = 30;
+
+    renderBatchSummary(session);
+    renderHistory();
+
+    setStatus('Calibré', 'ready');
+    disableControlsDuringMeasure(false);
+    toast('Série terminée', 'success');
+  }
+
+  function updateBatchDots(activeIdx, doneCount) {
+    document.querySelectorAll('.batch-dot').forEach((d, i) => {
+      d.classList.remove('active', 'done');
+      if (i < doneCount) d.classList.add('done');
+      else if (i === activeIdx) d.classList.add('active');
+    });
+  }
+
+  function disableControlsDuringMeasure(disabled) {
+    $('btnMeasure').disabled = disabled;
+    $('btnCalibrate').disabled = disabled;
+    document.querySelectorAll('.mode-btn').forEach(b => b.disabled = disabled);
+    if (disabled) $('btnMeasure').classList.remove('pulsing');
+    else $('btnMeasure').classList.add('pulsing');
+  }
+
+  // ==========================================================================
+  // RENDERING
+  // ==========================================================================
+  function renderSingleResult(heightCm) {
+    $('resultNum').textContent = heightCm.toFixed(1);
+    const allJumps = state.sessions.flatMap(s => s.jumps.map(j => j.heightCm));
+    const best = Math.max(...allJumps);
+    const avg = allJumps.reduce((a, b) => a + b, 0) / allJumps.length;
+    $('bestVal').textContent = best.toFixed(1) + ' cm';
+    $('avgVal').textContent = avg.toFixed(1) + ' cm';
+    $('countVal').textContent = allJumps.length;
+  }
+
+  function renderBatchSummary(session) {
+    const values = session.jumps.map(j => j.heightCm);
+    const stats = computeStats(values);
+    const bestIdx = values.indexOf(stats.best);
+
+    $('batchSummaryTime').textContent = formatTime(session.timestamp);
+    $('batchJumps').innerHTML = values.map((v, i) => `
+      <div class="batch-jump ${i === bestIdx ? 'best' : ''}">
+        <div class="batch-jump-num">Saut ${i + 1}</div>
+        <div class="batch-jump-val">${v.toFixed(1)}<span class="batch-jump-unit">cm</span></div>
+        ${i === bestIdx ? '<div class="batch-jump-tag">PEAK</div>' : ''}
+      </div>
+    `).join('');
+
+    $('batchBest').innerHTML = `${stats.best.toFixed(1)} <span class="tiny">cm</span>`;
+    $('batchMean').innerHTML = `${stats.mean.toFixed(1)} <span class="tiny">cm</span>`;
+    $('batchStd').innerHTML = `± ${stats.std.toFixed(1)} <span class="tiny">cm</span>`;
+    $('batchCV').innerHTML = `${stats.cv.toFixed(1)} <span class="tiny">%</span>`;
+
+    let comment = '';
+    if (stats.cv < 3) {
+      comment = `<span class="rating good">EXCELLENT</span> — exécution très consistante. Le niveau mesuré reflète bien la réalité de ta/sa détente.`;
+    } else if (stats.cv < 5) {
+      comment = `<span class="rating ok">BON</span> — consistance correcte. Le meilleur saut est représentatif du potentiel actuel.`;
+    } else if (stats.cv < 8) {
+      comment = `<span class="rating warn">MOYEN</span> — dispersion notable. Fatigue possible, ou technique d'armé-poussée en apprentissage.`;
+    } else {
+      comment = `<span class="rating bad">IRRÉGULIER</span> — exécution variable. Stabiliser la technique avant de chercher la perf.`;
+    }
+    $('batchComment').innerHTML = comment;
+
+    $('batchSummary').classList.add('visible');
+  }
+
+  function renderHistory() {
+    const list = $('historyList');
+    const n = state.sessions.length;
+    $('historyCount').textContent = n + (n > 1 ? ' sessions' : ' session');
+
+    if (!n) {
+      list.innerHTML = '<div class="history-empty">Aucune mesure enregistrée.<br>Lance une session pour commencer.</div>';
+      return;
+    }
+
+    const allValues = state.sessions.flatMap(s => s.jumps.map(j => j.heightCm));
+    const allTimeBest = Math.max(...allValues);
+
+    list.innerHTML = state.sessions.map((s) => {
+      const time = formatTime(s.timestamp);
+      if (s.type === 'single') {
+        const v = s.jumps[0].heightCm;
+        const isPR = Math.abs(v - allTimeBest) < 0.01;
+        return `
+          <div class="history-session">
+            <div class="history-session-header">
+              <div class="history-session-label">1 saut${isPR ? ' · <span style="color:var(--accent)">PR</span>' : ''}</div>
+              <div class="history-session-time">${time}</div>
+            </div>
+            <div class="history-session-body">
+              <div class="history-main">${v.toFixed(1)}<span class="unit">cm</span></div>
+            </div>
+          </div>`;
+      } else {
+        const vals = s.jumps.map(j => j.heightCm);
+        const st = computeStats(vals);
+        const isPR = Math.abs(st.best - allTimeBest) < 0.01;
+        return `
+          <div class="history-session batch">
+            <div class="history-session-header">
+              <div class="history-session-label">Série 3 sauts${isPR ? ' · <span style="color:var(--accent)">PR</span>' : ''}</div>
+              <div class="history-session-time">${time}</div>
+            </div>
+            <div class="history-session-body">
+              <div class="history-main">${st.best.toFixed(1)}<span class="unit">cm</span></div>
+              <div class="history-sub">
+                moy <b>${st.mean.toFixed(1)}</b> · σ ± <b>${st.std.toFixed(1)}</b> · CV <b>${st.cv.toFixed(1)}%</b>
+              </div>
+              <div class="history-sub" style="width:100%; margin-top:4px;">
+                ${vals.map(v => v.toFixed(1)).join(' · ')}
+              </div>
+            </div>
+          </div>`;
+      }
+    }).join('');
+  }
+
+  function resetHistory() {
+    if (!state.sessions.length) return;
+    if (!confirm('Effacer l\'historique complet ?')) return;
+    state.sessions = [];
+    $('resultNum').textContent = '—';
+    $('bestVal').textContent = '— cm';
+    $('avgVal').textContent = '— cm';
+    $('countVal').textContent = '0';
+    $('batchSummary').classList.remove('visible');
+    $('resultCard').style.display = 'block';
+    renderHistory();
+    toast('Historique effacé');
+  }
+
+  // ==========================================================================
+  // MODE TOGGLE
+  // ==========================================================================
+  function setMode(mode) {
+    state.mode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    $('btnMeasureLabel').textContent = mode === 'batch' ? 'Lancer la série' : 'Mesurer un saut';
+    $('btnMeasure').querySelector('.btn-icon').textContent = mode === 'batch' ? '◆◆◆' : '↑';
+  }
+
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (state.batchInProgress || state.phase === 'measuring') return;
+      setMode(btn.dataset.mode);
+    });
+  });
+
+  // ==========================================================================
+  // BINDINGS
+  // ==========================================================================
+  $('btnStart').addEventListener('click', () => state.running ? stopCamera() : startCamera());
+  $('btnSwitch').addEventListener('click', switchCamera);
+  $('btnCalibrate').addEventListener('click', calibrate);
+  $('btnMeasure').addEventListener('click', () => state.mode === 'batch' ? measureBatch() : measureSingle());
+  $('btnReset').addEventListener('click', resetHistory);
+
+  showOverlay('Caméra inactive',
+    'Entre ta taille puis active la caméra. Place le téléphone à 2–3 m, corps entier visible avec de la marge au-dessus pour le saut.', '◎');
+})();
+</script>
+</body>
+</html>
