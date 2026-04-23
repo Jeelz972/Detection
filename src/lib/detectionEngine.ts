@@ -1,33 +1,36 @@
 // src/lib/detectionEngine.ts
-import { DETECTION_BAREMES } from "./baremes";
+import { loadTestsConfig, type TestDefinition } from "./testsConfig";
 
 export const DetectionEngine = {
-  // Calcule la note de 1 à 20 en fonction du barème
-  getRating: function (
-    testName: string,
-    value: number,
-    category: string,
-  ): number {
-    const categoryBareme = (DETECTION_BAREMES as any)[category];
-    if (!categoryBareme || !categoryBareme[testName]) return 0;
+  getRating: function (testNameOrId: string, value: number, category: string): number {
+    const config = loadTestsConfig();
+    const allTests: TestDefinition[] = [...config.physique, ...config.technique];
+    const test = allTests.find((t) => t.id === testNameOrId) || allTests.find((t) => t.name === testNameOrId);
+    if (!test) return 0;
 
-    const scores = categoryBareme[testName].points;
-    const thresholds = Object.keys(scores)
-      .map(Number)
-      .sort((a, b) => a - b);
+    const bareme = test.baremes[category];
+    if (!bareme) return 0;
+    const { thresholds, scores } = bareme;
 
-    // Logique de recherche du score (à adapter selon si "plus petit = mieux" comme le sprint)
-    let finalScore = 0;
-    for (const t of thresholds) {
-      if (value <= t) {
-        finalScore = scores[t];
-        break;
+    if (test.direction === "lower_is_better") {
+      for (let i = 0; i < thresholds.length; i++) {
+        if (value <= thresholds[i]) return scores[i];
       }
+      return scores[scores.length - 1] || 0;
+    } else {
+      for (let i = thresholds.length - 1; i >= 0; i--) {
+        if (value >= thresholds[i]) return scores[i];
+      }
+      return scores[0] || 0;
     }
-    return finalScore;
   },
 
-  // Génère un ID unique pour une nouvelle détection
+  getTestDefinition: function (testNameOrId: string): TestDefinition | undefined {
+    const config = loadTestsConfig();
+    const allTests: TestDefinition[] = [...config.physique, ...config.technique];
+    return allTests.find((t) => t.id === testNameOrId) || allTests.find((t) => t.name === testNameOrId);
+  },
+
   generateId: function (prefix: string = "det"): string {
     return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
   },
